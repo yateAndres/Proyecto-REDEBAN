@@ -1,0 +1,152 @@
+-- Procedimiento encriptar
+
+CREATE PROCEDURE p_encriptar_password_sha2(
+    IN p_password VARCHAR(255),
+    OUT p_password_hash VARCHAR(255)
+)
+BEGIN
+    DECLARE v_salt VARCHAR(64);
+    DECLARE v_hash VARCHAR(64);
+
+    IF p_password IS NULL OR p_password = '' THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'La contraseña no puede estar vacía';
+    END IF;
+
+    SET v_salt = SHA2(UUID(), 256);
+    SET v_hash = SHA2(CONCAT(p_password, v_salt), 256);
+
+    SET p_password_hash = CONCAT(v_salt, ':', v_hash);
+
+END
+
+-- Procedimiento validar
+
+CREATE PROCEDURE p_verificar_password(
+    IN p_password VARCHAR(255),
+    IN p_hash_guardado VARCHAR(255),
+    OUT p_valido BOOLEAN
+)
+BEGIN
+    DECLARE v_salt VARCHAR(64);
+    DECLARE v_hash VARCHAR(64);
+    DECLARE v_hash_calculado VARCHAR(64);
+
+    SET v_salt = SUBSTRING_INDEX(p_hash_guardado, ':', 1);
+    SET v_hash = SUBSTRING_INDEX(p_hash_guardado, ':', -1);
+
+    SET v_hash_calculado = SHA2(CONCAT(p_password, v_salt), 256);
+
+    SET p_valido = (v_hash = v_hash_calculado);
+
+END
+
+-- registrar_usuario
+
+CREATE PROCEDURE sp_registrar_usuario(
+    IN p_primer_nombre VARCHAR(50),
+    IN p_segundo_nombre VARCHAR(50),
+    IN p_primer_apellido VARCHAR(50),
+    IN p_segundo_apellido VARCHAR(50),
+    IN p_documento VARCHAR(20),
+    IN p_telefono VARCHAR(15),
+    IN p_email VARCHAR(100),
+    IN p_password VARCHAR(255)
+)
+BEGIN
+    DECLARE v_id_usuario INT;
+    DECLARE v_password_hash VARCHAR(255);
+    DECLARE v_id_rol INT;
+    DECLARE v_id_estado INT;
+
+    -- Handler de errores
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT FALSE AS success, 'Error al registrar usuario' AS mensaje;
+    END;
+
+    START TRANSACTION;
+
+    main_block: BEGIN
+
+        -- Validar documento
+        IF EXISTS (SELECT 1 FROM usuario WHERE documento = p_documento) THEN
+            SELECT FALSE AS success, 'Documento ya registrado' AS mensaje;
+            ROLLBACK;
+            LEAVE main_block;
+        END IF;
+
+        -- Validar email
+        IF EXISTS (SELECT 1 FROM usuario WHERE email = p_email) THEN
+            SELECT FALSE AS success, 'Email ya registrado' AS mensaje;
+            ROLLBACK;
+            LEAVE main_block;
+        END IF;
+
+        -- Encriptar contraseña
+        SET v_password_hash = SHA2(p_password, 256);
+
+        -- Obtener rol "Cliente"
+        SELECT id_rol INTO v_id_rol
+        FROM rol
+        WHERE nombre = 'Cliente'
+        LIMIT 1;
+
+        IF v_id_rol IS NULL THEN
+            SELECT FALSE AS success, 'Rol Cliente no existe' AS mensaje;
+            ROLLBACK;
+            LEAVE main_block;
+        END IF;
+
+        -- Obtener estado "Activo"
+        SELECT id_estado INTO v_id_estado
+        FROM estado_usuario
+        WHERE nombre = 'Activo'
+        LIMIT 1;
+
+        IF v_id_estado IS NULL THEN
+            SELECT FALSE AS success, 'Estado Activo no existe' AS mensaje;
+            ROLLBACK;
+            LEAVE main_block;
+        END IF;
+
+        -- Insertar usuario
+        INSERT INTO usuario (
+            primer_nombre,
+            segundo_nombre,
+            primer_apellido,
+            segundo_apellido,
+            documento,
+            telefono,
+            email,
+            p_password,
+            id_rol,
+            id_estado
+        ) VALUES (
+            p_primer_nombre,
+            p_segundo_nombre,
+            p_primer_apellido,
+            p_segundo_apellido,
+            p_documento,
+            p_telefono,
+            p_email,
+            v_password_hash,
+            v_id_rol,
+            v_id_estado
+        );
+
+        SET v_id_usuario = LAST_INSERT_ID();
+
+        COMMIT;
+
+        -- Respuesta
+        SELECT 
+            TRUE AS success,
+            'Usuario registrado correctamente' AS mensaje,
+            v_id_usuario AS id_usuario,
+            p_email AS email;
+
+    END main_block;
+
+END

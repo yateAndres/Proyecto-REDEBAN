@@ -23,6 +23,7 @@ CREATE TABLE usuario (
     documento VARCHAR(20) NOT NULL UNIQUE,
     telefono VARCHAR(15) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
     id_rol INT NOT NULL,
     id_estado INT NOT NULL,
     FOREIGN KEY (id_rol) REFERENCES rol(id_rol)

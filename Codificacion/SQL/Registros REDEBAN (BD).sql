@@ -62,9 +62,9 @@ INSERT INTO tipo_accion (nombre) VALUES
 ('Cancelación');
 
 INSERT INTO historial (id_tipo_accion, descripcion, fecha, id_registro) VALUES
-(1, 'Ingreso vehiculo ABC123', '2026-03-28 08:00:00', 7),
-(2, 'Salida vehiculo ABC123', '2026-03-28 10:00:00', 8),
-(1, 'Ingreso vehiculo XYZ789', '2026-03-28 09:00:00', 9);
+(1, 'Ingreso vehiculo ABC123', '2026-03-28 08:00:00', 1),
+(2, 'Salida vehiculo ABC123', '2026-03-28 10:00:00', 1),
+(1, 'Ingreso vehiculo XYZ789', '2026-03-28 09:00:00', 2);
 
 INSERT INTO tipo_reporte (nombre) VALUES
 ('Incidente'),
