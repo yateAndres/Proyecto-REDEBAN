@@ -1,96 +1,61 @@
 USE parqueadero_bd;
 
--- JOINS
--- Ver vehículos con su propietario
-SELECT 
-    v.placa,
-    v.marca,
-    v.color,
-    u.primer_nombre,
-    u.primer_apellido
-FROM vehiculo v
-JOIN usuario u 
-    ON v.id_usuario = u.id_usuario;
+-- 1. ACTUALIZAR ROL DE UN USUARIO
+UPDATE usuario
+SET id_rol = (
+    SELECT id_rol 
+    FROM rol 
+    WHERE nombre = 'Guardia'
+)
+WHERE id_usuario = 1;
 
+select * from usuario;
+select * from rol;
 
--- Ver parqueaderos con su estado
+--  2. PORCENTAJE DE OCUPACIÓN POR ZONA
 SELECT 
     p.zona,
-    p.numero,
-    ep.nombre AS estado
+    COUNT(*) * 100.0 / (
+        SELECT COUNT(*) 
+        FROM parqueadero p2 
+        WHERE p2.zona = p.zona
+    ) AS porcentaje_ocupacion
 FROM parqueadero p
-JOIN estado_parqueadero ep 
-    ON p.id_estado_parqueadero = ep.id_estado_parqueadero;
+WHERE id_estado_parqueadero = (
+    SELECT id_estado_parqueadero 
+    FROM estado_parqueadero 
+    WHERE nombre = 'Ocupado'
+)
+GROUP BY p.zona;
 
 
--- Ver reservas con usuario y vehículo
+-- 3. CONSULTA DE VEHÍCULOS Y USUARIOS (FILTRO)
 SELECT 
-    r.id_reserva,
-    u.primer_nombre,
-    v.placa,
-    r.fecha_inicio,
-    r.fecha_fin
-FROM reserva r
-JOIN usuario u ON r.id_usuario = u.id_usuario
-JOIN vehiculo v ON r.id_vehiculo = v.id_vehiculo;
-
-
--- CONSULTAS
--- Contar vehículos por tipo
-SELECT 
-    tv.nombre,
-    COUNT(*) AS cantidad
+    v.placa, 
+    u.primer_nombre, 
+    u.primer_apellido, 
+    p.zona, 
+    p.numero
 FROM vehiculo v
-JOIN tipo_vehiculo tv 
-    ON v.id_tipo_vehiculo = tv.id_tipo_vehiculo
-GROUP BY tv.nombre;
+JOIN usuario u 
+    ON v.id_usuario = u.id_usuario
+JOIN reserva r 
+    ON v.id_vehiculo = r.id_vehiculo 
+JOIN parqueadero p 
+    ON r.id_parqueadero = p.id_parqueadero
+WHERE v.placa LIKE 'ABC%' 
+   OR u.primer_nombre LIKE '%Juan%';
 
 
--- Usuarios activos
-SELECT *
-FROM usuario u
-JOIN estado_usuario eu 
-    ON u.id_estado = eu.id_estado
-WHERE eu.nombre = 'Activo';
--- 
-
--- Parqueaderos disponibles
-SELECT *
-FROM parqueadero p
-JOIN estado_parqueadero ep 
-    ON p.id_estado_parqueadero = ep.id_estado_parqueadero
-WHERE ep.nombre = 'Disponible';
-
-
--- SUBCONSULTAS
--- Usuarios con reservas activas
-SELECT primer_nombre, primer_apellido
-FROM usuario
-WHERE id_usuario IN (
-    SELECT id_usuario
-    FROM reserva
-    WHERE NOW() BETWEEN fecha_inicio AND fecha_fin
+-- 4. ELIMINAR HISTORIAL ANTIGUO (PRIMERO)
+DELETE FROM historial 
+WHERE id_registro IN (
+    SELECT id_registro 
+    FROM registro 
+    WHERE entrada < '2025-01-01'
 );
 
-
--- Vehículos en parqueadero ahora
-SELECT placa
-FROM vehiculo
-WHERE id_vehiculo IN (
-    SELECT r.id_vehiculo
-    FROM reserva r
-    JOIN registro reg ON r.id_reserva = reg.id_reserva
-    WHERE reg.salida IS NULL
-);
-
-
--- Parqueaderos ocupados
-SELECT zona, numero
-FROM parqueadero
-WHERE id_parqueadero IN (
-    SELECT id_parqueadero
-    FROM reserva
-);
-
-
--- 
+-- 5. Verificar que sí se eliminó
+SELECT * 
+FROM registro
+WHERE entrada < '2025-01-01';
